@@ -1,3 +1,31 @@
+////------------------------------306-7 Error handling----------------------------------------------------
+/*
+Para definir la ejecucion
+<<<a,b>>>
+a = blocks
+b = threads
+Realmente son 3 dimensiones (a x b x c)
+
+dim3
+conversion automatica de <<<a,b>>> = (a,1,1) por (b,1,1)
+
+blockldx	=		donde estamos en la cuadrícula
+gridDim		=		tamaño de la cuadricula
+threadldmx	=		posición del hilo actual en el bloque de hilo
+blockDim	=		Tamaño del bloque de hilo
+
+max_threads_per_block =	 512
+max_threads_per_multiprocessor = 1024
+
+VERIFICAR ERRORES EN GPU. (regularmente no los marca a menos que se supervicen los status)
+cudaSuccess
+cudaGetErrorString()
+cuRAND tiene curandStatus_t
+
+
+*/
+
+
 //------------------------------303-4 EXECUTION MODEL----------------------------------------------------
 /*
 
