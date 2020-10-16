@@ -1,3 +1,41 @@
+////------------------------------308 Devide Introspection----------------------------------------------------
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include <stdio.h>
+#include <iostream>
+using namespace std;
+
+int main() {
+	int count;
+	cudaGetDeviceCount(&count);  //numero de dispositivos o gpu's
+
+	cudaDeviceProp prop;	//informacion sobre el dispositivo
+
+	for (int i = 0; i < count; i++)
+	{
+		cudaGetDeviceProperties(&prop, i);
+		cout << "Device " << i << ": " << prop.name << endl; // nombre del dispositivo
+		cout << "Compute capability: " << prop.major << "." << prop.minor << endl; // capacidad de calculo
+
+		cout << "Maximum grid dimensions: (:" <<
+			prop.maxGridSize[0] << " x " <<
+			prop.maxGridSize[1] << " x " <<
+			prop.maxGridSize[2] << ") " << endl; // dimensiones maximas de cuadricula y bloque
+
+		cout << "Maximum block dimensions: (:" <<
+			prop.maxThreadsDim[0] << " x " <<
+			prop.maxThreadsDim[1] << " x " <<
+			prop.maxThreadsDim[2] << ") " << endl; // dimensiones maximas de cuadricula y bloque
+
+
+
+	}
+
+	return 0;
+}
+
+
 ////------------------------------306-7 Error handling----------------------------------------------------
 /*
 Para definir la ejecucion
@@ -44,77 +82,77 @@ EXECUTION MODEL
 */
 
 
-
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-#include <stdio.h>
-#include <iostream>
-using namespace std;
-
-
-void sumArray(int* a1, int* b1, int* c1, int count1) {
-	for (int i = 0; i < count1; i++)
-	{
-		c1[i] = a1[i] + b1[i];
-	}
-}
-
-//modificanco para usar hilos en gpu global se invoca en el CPU pero se ejecuta en GPU
-__global__ void sumArrayGpu(int* a, int* b, int* c) { //GLOBAL -- FUNCION HACIA GPU	
-	int i = threadIdx.x; // indice de hilo
-	c[i] = a[i] + b[i];
-}
-
-void main()
-{
-	const int count1 = 5;
-	int a1[] = { 1,2,3,4,5 };
-	int b1[] = { 10,20,30,40,50 };
-	int c1[count1];
-
-	sumArray(a1, b1, c1, count1);
-
-	//Imprimir
-	for (int i = 0; i < count1; i++)
-	{
-		cout << "posicion: " << i << " corresponde a: " << c1[i] << endl;
-	}
-
-	//----- LO MISMO PERO CON GPU ---
-
-	const int count = 5;
-	const int size = count * sizeof(int); //numero de elementos multiplicado por su tamaño para asignar memoria en GPU
-	//int a[] = { 1,2,3,4,5 };
-	int ha[] = { 1,2,3,4,5 }; // el cambio de nombre es para especificar que esta en el HOST
-	//int b[] = { 10,20,30,40,50 };
-	int hb[] = { 10,20,30,40,50 };
-	//int c[count];
-	int hc[count];
-
-	int* da, * dc, * db;//asignando memoria CPU
-	cudaMalloc(&da, size);//asignando memoria en GPU
-	cudaMalloc(&db, size);//asignando memoria en GPU
-	cudaMalloc(&dc, size);//asignando memoria en GPU
-
-	//copiando datos a GPU
-	//cudaMemcpy(da, ha, size, cudaMemcpyKind::cudaMemcpyHostToDevice); // instruccion completa
-	cudaMemcpy(da, ha, size, cudaMemcpyHostToDevice); // instruccion corta
-	cudaMemcpy(db, hb, size, cudaMemcpyHostToDevice); // instruccion corta
-
-	//el 1 se refiere a un bloque
-	//count hace referencia a los hilos EL 1 SE REFIERE A UN BLOQUE Y EL COUNT =5 SE REFIERE A 5 HILOS
-	sumArrayGpu << <1, count >> > (da, db, dc); // el error señalado aqui no es un error realmente es fallo de analisis del VS
-
-	//Recuperando datos desde GPU
-	cudaMemcpy(hc, dc, size, cudaMemcpyDeviceToHost); //
-
-	//Imprimir
-	for (int i = 0; i < count1; i++)
-	{
-		cout << "posicion: " << i << " corresponde a: " << hc[i] << endl;
-	}
-
-}
+//
+//#include "cuda_runtime.h"
+//#include "device_launch_parameters.h"
+//#include <stdio.h>
+//#include <iostream>
+//using namespace std;
+//
+//
+//void sumArray(int* a1, int* b1, int* c1, int count1) {
+//	for (int i = 0; i < count1; i++)
+//	{
+//		c1[i] = a1[i] + b1[i];
+//	}
+//}
+//
+////modificanco para usar hilos en gpu global se invoca en el CPU pero se ejecuta en GPU
+//__global__ void sumArrayGpu(int* a, int* b, int* c) { //GLOBAL -- FUNCION HACIA GPU	
+//	int i = threadIdx.x; // indice de hilo
+//	c[i] = a[i] + b[i];
+//}
+//
+//void main()
+//{
+//	const int count1 = 5;
+//	int a1[] = { 1,2,3,4,5 };
+//	int b1[] = { 10,20,30,40,50 };
+//	int c1[count1];
+//
+//	sumArray(a1, b1, c1, count1);
+//
+//	//Imprimir
+//	for (int i = 0; i < count1; i++)
+//	{
+//		cout << "posicion: " << i << " corresponde a: " << c1[i] << endl;
+//	}
+//
+//	//----- LO MISMO PERO CON GPU ---
+//
+//	const int count = 5;
+//	const int size = count * sizeof(int); //numero de elementos multiplicado por su tamaño para asignar memoria en GPU
+//	//int a[] = { 1,2,3,4,5 };
+//	int ha[] = { 1,2,3,4,5 }; // el cambio de nombre es para especificar que esta en el HOST
+//	//int b[] = { 10,20,30,40,50 };
+//	int hb[] = { 10,20,30,40,50 };
+//	//int c[count];
+//	int hc[count];
+//
+//	int* da, * dc, * db;//asignando memoria CPU
+//	cudaMalloc(&da, size);//asignando memoria en GPU
+//	cudaMalloc(&db, size);//asignando memoria en GPU
+//	cudaMalloc(&dc, size);//asignando memoria en GPU
+//
+//	//copiando datos a GPU
+//	//cudaMemcpy(da, ha, size, cudaMemcpyKind::cudaMemcpyHostToDevice); // instruccion completa
+//	cudaMemcpy(da, ha, size, cudaMemcpyHostToDevice); // instruccion corta
+//	cudaMemcpy(db, hb, size, cudaMemcpyHostToDevice); // instruccion corta
+//
+//	//el 1 se refiere a un bloque
+//	//count hace referencia a los hilos EL 1 SE REFIERE A UN BLOQUE Y EL COUNT =5 SE REFIERE A 5 HILOS
+//	sumArrayGpu << <1, count >> > (da, db, dc); // el error señalado aqui no es un error realmente es fallo de analisis del VS
+//
+//	//Recuperando datos desde GPU
+//	cudaMemcpy(hc, dc, size, cudaMemcpyDeviceToHost); //
+//
+//	//Imprimir
+//	for (int i = 0; i < count1; i++)
+//	{
+//		cout << "posicion: " << i << " corresponde a: " << hc[i] << endl;
+//	}
+//
+//}
 
 
 ////------------------------------303 HELLO CUDA----------------------------------------------------
