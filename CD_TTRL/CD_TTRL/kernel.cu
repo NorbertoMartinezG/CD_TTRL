@@ -1,39 +1,121 @@
-////------------------------------308 Devide Introspection----------------------------------------------------
+
+////------------------------------401 patrones de computacion paralela------------------------------------------------------------------------
+
+//- Element Addressing
+//- Map
+//- Gather
+//- Scatter
+//- Reduce
+//- Scan
+
+//Ejemplos
+//
+//- 1 block, N threads -> htreadldx.x
+//- 1 block, MxN threads -> threadldx.y * blockDim.x + threadldx.x
+//- N blocks, M threads -> blockldx.x * gridDim.x + threadldx.x
+
+//--  MAP  --
+//Aplicar una funcion a cada valor en la entrada
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include <stdio.h>
+#include "curand.h"
+
 #include <iostream>
+#include <ctime>
+#include <cstdio>
+
+
 using namespace std;
 
-int main() {
-	int count;
-	cudaGetDeviceCount(&count);  //numero de dispositivos o gpu's
 
-	cudaDeviceProp prop;	//informacion sobre el dispositivo
+__global__ void addTen(float* d, int count)
+{
+	int threadsPerBlock = blockDim.x * blockDim.y * blockDim.z; //calculando el indice de un elemento en un espacio de 6 dimensiones(calcular el numero de subprocesos por bloque que existen)
+	int treadPosInBlock = threadIdx.x +  // posicion del hilo (blckDim.x = bloque de dimension) // Tres dimensiones
+		blockDim.x * threadIdx.y +
+		blockDim.x * blockDim.y * threadIdx.z;
+	int blckPosInGrid = blockIdx.x +  // calculo de la posicion del bloque en una cuadricula
+		gridDim.x * blockIdx.y +
+		gridDim.x * gridDim.y * blockIdx.z;
 
-	for (int i = 0; i < count; i++)
+	int tid = blckPosInGrid * threadsPerBlock + treadPosInBlock; // posicion del hilo
+
+	if (tid < count)
 	{
-		cudaGetDeviceProperties(&prop, i);
-		cout << "Device " << i << ": " << prop.name << endl; // nombre del dispositivo
-		cout << "Compute capability: " << prop.major << "." << prop.minor << endl; // capacidad de calculo
+		d[tid] = d[tid] + 10;
+	}
 
-		cout << "Maximum grid dimensions: (:" <<
-			prop.maxGridSize[0] << " x " <<
-			prop.maxGridSize[1] << " x " <<
-			prop.maxGridSize[2] << ") " << endl; // dimensiones maximas de cuadricula y bloque
+}	
 
-		cout << "Maximum block dimensions: (:" <<
-			prop.maxThreadsDim[0] << " x " <<
-			prop.maxThreadsDim[1] << " x " <<
-			prop.maxThreadsDim[2] << ") " << endl; // dimensiones maximas de cuadricula y bloque
+int main() {
 
+	//GENERADOR NUMEROS ALEATORIOS
+	curandGenerator_t gen; // genera numeros aleatorios
+	curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_MTGP32); // inicializar generador
+	curandSetPseudoRandomGeneratorSeed(gen, time(0));// valor semilla
+	const int cantidad = 123456;//numero de valores a inicializar
+	const int size = cantidad * sizeof(float);
+	float *d; // puntero donde estara almacenado
+	float h[cantidad]; //matriz
+	cudaMalloc(&d, size);
+	curandGenerateUniform(gen, d, cantidad);
 
+	// dimensiones kernel
+	dim3 block(8, 8, 8); // bloque de 512 
+	dim3 cuadricula(16, 16);
 
+	addTen <<< cuadricula, block >>> (d, cantidad); //inicializamos el kernel
+	
+	cudaMemcpy(h, d, size, cudaMemcpyDeviceToHost); //copiar valores resultados desde kernel
+
+	cudaFree(d); //liberar memoria puntero
+
+	for (int i = 0; i < 100; i++)
+	{
+		cout << h[i] << endl;
 	}
 
 	return 0;
 }
+
+
+////------------------------------308 Devide Introspection----------------------------------------------------
+
+//#include "cuda_runtime.h"
+//#include "device_launch_parameters.h"
+//#include <stdio.h>
+//#include <iostream>
+//using namespace std;
+//
+//int main() {
+//	int count;
+//	cudaGetDeviceCount(&count);  //numero de dispositivos o gpu's
+//
+//	cudaDeviceProp prop;	//informacion sobre el dispositivo
+//
+//	for (int i = 0; i < count; i++)
+//	{
+//		cudaGetDeviceProperties(&prop, i);
+//		cout << "Device " << i << ": " << prop.name << endl; // nombre del dispositivo
+//		cout << "Compute capability: " << prop.major << "." << prop.minor << endl; // capacidad de calculo
+//
+//		cout << "Maximum grid dimensions: (:" <<
+//			prop.maxGridSize[0] << " x " <<
+//			prop.maxGridSize[1] << " x " <<
+//			prop.maxGridSize[2] << ") " << endl; // dimensiones maximas de cuadricula y bloque
+//
+//		cout << "Maximum block dimensions: (:" <<
+//			prop.maxThreadsDim[0] << " x " <<
+//			prop.maxThreadsDim[1] << " x " <<
+//			prop.maxThreadsDim[2] << ") " << endl; // dimensiones maximas de cuadricula y bloque
+//
+//
+//
+//	}
+//
+//	return 0;
+//}
 
 
 ////------------------------------306-7 Error handling----------------------------------------------------
