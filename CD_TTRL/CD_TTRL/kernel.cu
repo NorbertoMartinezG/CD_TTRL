@@ -1,6 +1,246 @@
+//////------------------------------ THE MANY TYPES OF MEMORY  ---------------------------------------------------------------------------------  
 
-////------------------------------401 patrones de computacion paralela------------------------------------------------------------------------
+/*
+GRPHICS PROCESSOR ARCHITECTURE
 
+-SM-1
+	SP-1
+		-Texture cache
+		-Constant cache
+		-Shared Memory
+		-Device Memory
+	SP-2
+		-Texture cache
+		-Constant cache
+		-Shared Memory
+		-Device Memory
+	SP-N
+		-Texture cache
+		-Constant cache
+		-Shared Memory
+		-Device Memory
+-Device Memory
+
+DEVICE MEMORY
+
+-Grid scope ( available to all threads in all blocks in the grid )
+-Aplication lifetime ( una vez que se asigna, existe hasta que se cierra la aplicacion
+-Dynamic 
+	-cudaMalloc() -- Asignar parte de la memoria del dispositivo y luego pasa el puntero
+	-Pass pointer to kernel -- pasa el puntero a la memoria del kernel que desea ejecutar
+	-cudaMemcpy() -- copia desde la memoria del host
+	-cudaFree() -- Desasigna memoria
+
+-Static
+	-Declare global variable as device
+		__device__ int sum = 0; -- automaticamente asigna memoria e incluso la inicializa para usarla dentro del kernel
+	-Use freely within the kernel
+	-Use cudaMemcpy[to/from] symbol() to copy to/from host memory
+	-No need to explicity deallocate
+		
+*/
+
+//////------------------------------407 Scan  ---------------------------------------------------------------------------------  
+// /*suma paralela
+// Otra forma de Sumar todos los elementos en un vector.*/
+// 
+//#include "cuda_runtime.h"
+//#include "device_launch_parameters.h"
+//
+//#include <iostream>
+//
+//using namespace std;
+//
+//__global__ void runningSum(int* d)
+//{
+//	int threads = blockDim.x;
+//	int tid = threadIdx.x;
+//
+//	//tc - total number of threads allowed
+//	for (int tc = threads, step = 1; tc > 0; step *= 2)
+//	{
+//		// check if thread is allowed to do things
+//		if (tid < tc)
+//		{
+//			d[tid + step] += d[tid];
+//		}
+//		tc -= step;
+//	}
+//
+//
+//
+//}
+//
+//
+//int main()
+//{
+//	const int count = 5;
+//	const int size = count * sizeof(int); // esta valor es igual a 64
+//
+//	int h[count];
+//	for (int i = 0; i < count; i++)
+//	{
+//		h[i] = i + 1;
+//	}
+//
+//	int* d; // contenedor no inicializado
+//	cudaMalloc(&d, size);
+//	cudaMemcpy(d, h, size, cudaMemcpyHostToDevice);
+//
+//	runningSum << <1, count - 1 >> > (d);
+//
+//	cudaMemcpy(h, d, size, cudaMemcpyDeviceToHost);
+//
+//	for(int i = 0; i < count; ++i)
+//		cout << h[i] << '\t';
+//
+//	cudaFree(d);
+//
+//	return 0;
+//	
+//}
+
+
+
+////------------------------------406 Reduce ---------------------------------------------------------------------------------  
+// suma paralela
+// Sumar todos los elementos en un vector.
+
+//#include "cuda_runtime.h"
+//#include "device_launch_parameters.h"
+//
+//#include <iostream>
+//
+//using namespace std;
+//
+//
+//__global__ void sumSingleBlock(int* d) // kernel 
+//{
+//	int tid = threadIdx.x; //256 sumSingleBlock << <1, count / 2 >> > (d) **count = 512
+//
+//	//recuento de hilos  tc - number of participating threads
+//	//recuento de subprocesos
+//	//blockDim.x = 256 // tc se va dividiendo entre 2 tc >>=1
+//	//stepSize aumenta en potencia de 2 stepSize <<= 1 == 1,2,4,8,16,32,64
+//	for (int tc = blockDim.x, stepSize = 1; tc > 0; stepSize <<= 1, tc >>=1)   // >>= el valor se desplaza hacia la derecha en uno
+//	{
+//		//treat must be all
+//		if (tid < tc) // 256 < 256   // 
+//		{
+//			int pa = tid * stepSize * 2; // 256 * 1 * 2 
+//			int pb = pa + stepSize;		 // 512 + 1
+//			d[pa] += d[pb];		// d[512] += d[512] + d[513]  
+//		}
+//	}
+//
+//
+//
+//}
+//
+//
+//int main()
+//{
+//	const int count = 32;
+//	const int size = count * sizeof(int);
+//
+//	int h[count];
+//	for (int i = 0; i < count; i++)
+//	{
+//		h[i] = i + 1;  // rellenar vector origen del 1 al 512
+//	}
+//
+//	// asignar memoria
+//	int* d;
+//	cudaMalloc(&d, size);
+//	cudaMemcpy(d, h, size, cudaMemcpyHostToDevice); // copiar de host a device(gpu)
+//
+//	sumSingleBlock << <1, count / 2 >> > (d); // 1 = bloque 1 , count/2 = numero de hilos, d = conservar valores de d
+//
+//	int result;
+//	cudaMemcpy(&result, d, sizeof(int), cudaMemcpyDeviceToHost);
+//
+//	cout << "Sum is " << result << endl;
+//	cout << count << endl;
+//	cudaFree(d);
+//	return 0;
+//
+//}
+
+
+////------------------------------404 Gather--recopilar ---------------------------------------------------------------------------------  
+// NO FUNCIONA
+//BlackScholes
+
+//#include "cuda_runtime.h" 
+//#include "device_launch_parameters.h"
+//#include "curand.h"
+//
+//#define _USE_MATH_DEFINES
+//#include <iostream>
+//#include <ctime>
+//#include <cstdio>
+//#include <math.h>
+//
+//using namespace std;
+//
+//__device__ __host__ __inline__ float N(float x)
+//{
+//	return 0.5 + 0.5 * erf(x * M_SQRT1_1);
+//}
+//
+//__device__ __host__ void price(float k, float s, float t, float r, float v, float* c, float* p)
+//{
+//	float srt = v * sqrtf(t);
+//	float d1 = (logf(s/k)+(r+0.5*v*v)*t) / srt;
+//	float d2 = d1 - srt;
+//	float kert = k * expf(-r * t);
+//	*c = N(d1) * s - N(d2) * kert;
+//	*p = kert - s + *c;
+//}
+//
+//__global__ void price(float* k, float* s, float* t, float* r, float* v, float c, float* p)
+//{
+//	int idx = threadIdx.x;
+//	price(k[idx], s[idx], t[idx], r[idx], v[idx], &c[idx], &p[idx], );
+//}
+//
+//int main()
+//{
+//	const int count = 512; // numero de elementos a los que debemos poner precio
+//	const int size = count * sizeof(float);
+//
+//	float* args[5];
+//	curandGenerator_t gen; // Generador
+//
+//	curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_MTGP32);// inicializador
+//	
+//	for (int i = 0; i < 5; i++)
+//	{
+//		cudaMalloc(&args[i], size);
+//		curandGenerateUniform(gen, args[i], count);
+//	}
+//
+//	float* dc, * dp;
+//	cudaMalloc(&dc, size);
+//	cudaMalloc(&dp, size);
+//
+//	price << <1, count >> > (args[0], args[1], args[2], args[3], args[4], dc, dp);
+//
+//	return 0;
+//}
+
+
+
+
+
+
+
+
+
+
+
+////------------------------------401-403 patrones de computacion paralela------------------------------------------------------------------------
+// AÑADIR A -- LINKER-INPUT-ADDITIONAL DEPENDECIES -- EN CONFIGURACION LA LIBRERIA CURAND.H
 //- Element Addressing
 //- Map
 //- Gather
@@ -17,67 +257,67 @@
 //--  MAP  --
 //Aplicar una funcion a cada valor en la entrada
 
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-#include "curand.h"
-
-#include <iostream>
-#include <ctime>
-#include <cstdio>
-
-
-using namespace std;
-
-
-__global__ void addTen(float* d, int count)
-{
-	int threadsPerBlock = blockDim.x * blockDim.y * blockDim.z; //calculando el indice de un elemento en un espacio de 6 dimensiones(calcular el numero de subprocesos por bloque que existen)
-	int treadPosInBlock = threadIdx.x +  // posicion del hilo (blckDim.x = bloque de dimension) // Tres dimensiones
-		blockDim.x * threadIdx.y +
-		blockDim.x * blockDim.y * threadIdx.z;
-	int blckPosInGrid = blockIdx.x +  // calculo de la posicion del bloque en una cuadricula
-		gridDim.x * blockIdx.y +
-		gridDim.x * gridDim.y * blockIdx.z;
-
-	int tid = blckPosInGrid * threadsPerBlock + treadPosInBlock; // posicion del hilo
-
-	if (tid < count)
-	{
-		d[tid] = d[tid] + 10;
-	}
-
-}	
-
-int main() {
-
-	//GENERADOR NUMEROS ALEATORIOS
-	curandGenerator_t gen; // genera numeros aleatorios
-	curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_MTGP32); // inicializar generador
-	curandSetPseudoRandomGeneratorSeed(gen, time(0));// valor semilla
-	const int cantidad = 123456;//numero de valores a inicializar
-	const int size = cantidad * sizeof(float);
-	float *d; // puntero donde estara almacenado
-	float h[cantidad]; //matriz
-	cudaMalloc(&d, size);
-	curandGenerateUniform(gen, d, cantidad);
-
-	// dimensiones kernel
-	dim3 block(8, 8, 8); // bloque de 512 
-	dim3 cuadricula(16, 16);
-
-	addTen <<< cuadricula, block >>> (d, cantidad); //inicializamos el kernel
-	
-	cudaMemcpy(h, d, size, cudaMemcpyDeviceToHost); //copiar valores resultados desde kernel
-
-	cudaFree(d); //liberar memoria puntero
-
-	for (int i = 0; i < 100; i++)
-	{
-		cout << h[i] << endl;
-	}
-
-	return 0;
-}
+//#include "cuda_runtime.h"
+//#include "device_launch_parameters.h"
+//#include "curand.h"
+//
+//#include <iostream>
+//#include <ctime>
+//#include <cstdio>
+//
+//
+//using namespace std;
+//
+//
+//__global__ void addTen(float* d, int count)
+//{
+//	int threadsPerBlock = blockDim.x * blockDim.y * blockDim.z; //calculando el indice de un elemento en un espacio de 6 dimensiones(calcular el numero de subprocesos por bloque que existen)
+//	int treadPosInBlock = threadIdx.x +  // posicion del hilo (blckDim.x = bloque de dimension) // Tres dimensiones
+//		blockDim.x * threadIdx.y +
+//		blockDim.x * blockDim.y * threadIdx.z;
+//	int blckPosInGrid = blockIdx.x +  // calculo de la posicion del bloque en una cuadricula
+//		gridDim.x * blockIdx.y +
+//		gridDim.x * gridDim.y * blockIdx.z;
+//
+//	int tid = blckPosInGrid * threadsPerBlock + treadPosInBlock; // posicion del hilo
+//
+//	if (tid < count)
+//	{
+//		d[tid] = d[tid] + 10;
+//	}
+//
+//}	
+//
+//int main() {
+//
+//	GENERADOR NUMEROS ALEATORIOS
+//	curandGenerator_t gen; // genera numeros aleatorios
+//	curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_MTGP32); // inicializar generador
+//	curandSetPseudoRandomGeneratorSeed(gen, time(0));// valor semilla
+//	const int cantidad = 123456;//numero de valores a inicializar
+//	const int size = cantidad * sizeof(float);
+//	float *d; // puntero donde estara almacenado
+//	float h[cantidad]; //matriz
+//	cudaMalloc(&d, size);
+//	curandGenerateUniform(gen, d, cantidad);
+//
+//	 dimensiones kernel
+//	dim3 block(8, 8, 8); // bloque de 512 
+//	dim3 cuadricula(16, 16);
+//
+//	addTen <<< cuadricula, block >>> (d, cantidad); //inicializamos el kernel
+//	
+//	cudaMemcpy(h, d, size, cudaMemcpyDeviceToHost); //copiar valores resultados desde kernel
+//
+//	cudaFree(d); //liberar memoria puntero
+//
+//	for (int i = 0; i < 100; i++)
+//	{
+//		cout << h[i] << endl;
+//	}
+//
+//	return 0;
+//}
 
 
 ////------------------------------308 Devide Introspection----------------------------------------------------
