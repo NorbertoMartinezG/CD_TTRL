@@ -1,4 +1,40 @@
-//////------------------------------ THE MANY TYPES OF MEMORY  ---------------------------------------------------------------------------------  
+//////------------------------------ 700 ATOMIC OPERATIONS  ---------------------------------------------------------------------------------  
+/*
+x++ is a read-modify-write operation
+- Read x into a register
+- increment register value
+- Write register back into x
+- Effectively { temp 0 x; temp = temp + ; x = temp; }
+
+if twoo threads do x++
+
+- Each thread has its own temp (say t1 and t2)
+- { t1 = x; t1 = t1+1; x = t1; }
+- { t2 = x; t2 = t2+1; x = t2; }
+(RACE CONDITION: THE THREAD THAT WRITES TO X FIRST WINS)
+
+
+*/
+
+
+
+//////------------------------------ 600 THREAD COOPERATION AND SYNCHRONIZATION  ---------------------------------------------------------------------------------  
+/*
+-Interaccion entre hilos
+Los subprocesos pueden tardar diferentes cantidades de tiempo en completar una parte de un cálculo.
+A veces, desea que todos los hilos lleguen a un punto en particular antes de continuar con su trabajo.
+Cuda ofrece una función de barrera de hilos __syncthreads ().
+Un hilo que llama a __syncthreads () espera a que otros hilos lleguen a esta línea.
+
+
+
+*/
+
+
+
+
+
+//////------------------------------501-506 THE MANY TYPES OF MEMORY  ---------------------------------------------------------------------------------  
 
 /*
 GRPHICS PROCESSOR ARCHITECTURE
@@ -37,8 +73,94 @@ DEVICE MEMORY
 	-Use freely within the kernel
 	-Use cudaMemcpy[to/from] symbol() to copy to/from host memory
 	-No need to explicity deallocate
-		
+
+503- Constant & texture memory
+	-Memoria constante -- 64 kb
+	-Declare as __constant__
+	-cudaMemcpy [To/From] Symbol() to copy to/from host memory
+	-Es muy util cuando todos los hilos leen la misma ubicacion
+
+504 -Shared Memory
+	-compartir solo entre hilos del mismo bloque
+	-no se puede compartir entre bloques		
 */
+
+//EJEMPLO SHARED MEMORY CON OPERACION REDUCE
+
+ /*suma paralela
+ Sumar todos los elementos en un vector.*/
+
+//#include "cuda_runtime.h"
+//#include "device_launch_parameters.h"
+//
+//#include <iostream>
+//
+//using namespace std;
+//
+//__global__ void sumSingleBlock(int* d) // kernel 
+//{
+//	extern __shared__ int dcopy[]; //SE AGREGO PARA SHARED COPY
+//	int tid = threadIdx.x; //256 sumSingleBlock << <1, count / 2 >> > (d) **count = 512
+//	dcopy[tid * 2] = d[tid * 2];		//SE AGREGO PARA SHARED COPY
+//	dcopy[tid * 2+1] = d[tid * 2+1];	//SE AGREGO PARA SHARED COPY
+//
+//	//recuento de hilos  tc - number of participating threads
+//	//recuento de subprocesos
+//	//blockDim.x = 256 // tc se va dividiendo entre 2 tc >>=1
+//	//stepSize aumenta en potencia de 2 stepSize <<= 1 == 1,2,4,8,16,32,64
+//	for (int tc = blockDim.x, stepSize = 1; tc > 0; stepSize <<= 1, tc >>=1)   // >>= el valor se desplaza hacia la derecha en uno
+//	{
+//		//treat must be all
+//		if (tid < tc) // 256 < 256   // 
+//		{
+//			int pa = tid * stepSize * 2; // 256 * 1 * 2 
+//			int pb = pa + stepSize;		 // 512 + 1
+//			//d[pa] += d[pb];		// d[512] += d[512] + d[513]  
+//			dcopy[pa] += dcopy[pb];		// d[512] += d[512] + d[513]  SE AGREGO PARA SHARED COPY
+//		}
+//
+//		// SE AGREGO PARA SHARED COPY
+//		if (tid == 0)
+//		{
+//			d[0] = dcopy[0];
+//		}
+//	}
+//
+//}
+//
+//int main()
+//{
+//	const int count = 32;
+//	const int size = count * sizeof(int);
+//
+//	int h[count];
+//	for (int i = 0; i < count; i++)
+//	{
+//		h[i] = i + 1;  // rellenar vector origen del 1 al 512
+//	}
+//
+//	// asignar memoria
+//	int* d;
+//	cudaMalloc(&d, size);
+//	cudaMemcpy(d, h, size, cudaMemcpyHostToDevice); // copiar de host a device(gpu)
+//
+//	// SE AUMENTA ",size" a la instruccion para SHARED MEMORY
+//	sumSingleBlock << <1, count / 2, size >> > (d); // 1 = bloque 1 , count/2 = numero de hilos, d = conservar valores de d
+//
+//	int result;
+//	cudaMemcpy(&result, d, sizeof(int), cudaMemcpyDeviceToHost);
+//
+//	cout << "Sum is " << result << endl;
+//	cout << count << endl;
+//	cudaFree(d);
+//	return 0;
+//
+//}
+
+
+
+
+
 
 //////------------------------------407 Scan  ---------------------------------------------------------------------------------  
 // /*suma paralela
@@ -230,12 +352,17 @@ DEVICE MEMORY
 //}
 
 
+//505 - Resumen
+
+/* - DECLARATION				MEMORY			SCOPE			LIFETIME		SLOWDOWN
+	int foo;					register		Thread			kernel			1x
+	int foo[10];				local			Thread			kernel			100x
+	__shared__ int foo;			Shared			Block			kernel			1x
+	__device__ int foo;			global			Grid			Application		100x
+	__constant__ int foo;		constant		Grid			Application		1x
 
 
-
-
-
-
+*/
 
 
 
