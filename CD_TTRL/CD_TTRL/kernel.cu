@@ -13,8 +13,66 @@ if twoo threads do x++
 - { t2 = x; t2 = t2+1; x = t2; }
 (RACE CONDITION: THE THREAD THAT WRITES TO X FIRST WINS)
 
+703 - atomic functions
+
+Problema: muchos subprocesos acceden a la misma ubicación de memoria
+Las operaciones atómicas garantizan que solo un hilo pueda acceder a la ubicación
+Alcance de la cuadrícula!
+
+atomicOp(x,y)
+t1 = *x;		//read
+t2 = t1 OP y;	//modify
+*a = t2;		//write
+
+
 
 */
+
+// 704 ATOMIC SUM
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include "sm_20_atomic_functions.h"
+
+#include <stdio.h>
+#include <iostream>
+using namespace std;
+
+__device__ int dSum = 0;
+
+__global__ void sum(int* d)
+{
+	int tid = threadIdx.x;
+	//dSum += d[tid];
+	//IMPLEMENTANDO SUMA ATOMICA
+	atomicAdd(&dSum, d[tid]);
+}
+
+
+int main()
+{
+	const int count = 128;
+	const int size = sizeof(int) * count;
+
+	int h[count];
+	for (int i = 0; i < count; i++)
+	{
+		h[i] = i + 1;
+	}
+
+	int* d;
+	cudaMalloc(&d, size);
+	cudaMemcpy(d, h, size, cudaMemcpyHostToDevice);
+	sum << <1, count >> > (d);
+
+	int hSum;
+	cudaMemcpyFromSymbol(&hSum, dSum, sizeof(int));
+	cout << "The sum of numbers from 1 to " << count << " is: " << hSum << endl;
+
+	cudaFree(d);
+	return 0;
+}
 
 
 
