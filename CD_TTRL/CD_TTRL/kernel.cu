@@ -1,5 +1,32 @@
+//////------------------------------ 800 EVENTS AND STREAMS  ---------------------------------------------------------------------------------  
+
+/*
+- Events
+- Event API
+- Event example
+- Pinned memory
+- Streams
+- Stream API
+- single stream
+- multiple streams
+
+
+*/
+
+
+
 //////------------------------------ 700 ATOMIC OPERATIONS  ---------------------------------------------------------------------------------  
 /*
+SUMMARY
+- evita que las operaciones de los hilos sean interrumpidas por otros hilos que deben esperar
+-CUDA supports several atomic operations
+	-atomicAdd()
+	-atomicOr()
+	-atomicMin()... etc.
+
+-Atomics incur a heavy performance penalty
+
+
 x++ is a read-modify-write operation
 - Read x into a register
 - increment register value
@@ -29,51 +56,120 @@ t2 = t1 OP y;	//modify
 */
 
 // 704 ATOMIC SUM
+//
+//#include "cuda_runtime.h"
+//#include "device_launch_parameters.h"
+//
+//#include "sm_20_atomic_functions.h"
+//
+//#include <stdio.h>
+//#include <iostream>
+//using namespace std;
+//
+//__device__ int dSum = 0;
+//
+//__global__ void sum(int* d)
+//{
+//	int tid = threadIdx.x;
+//	//dSum += d[tid];
+//	//IMPLEMENTANDO SUMA ATOMICA
+//	atomicAdd(&dSum, d[tid]);
+//}
+//
+//
+//int main()
+//{
+//	const int count = 128;
+//	const int size = sizeof(int) * count;
+//
+//	int h[count];
+//	for (int i = 0; i < count; i++)
+//	{
+//		h[i] = i + 1;
+//	}
+//
+//	int* d;
+//	cudaMalloc(&d, size);
+//	cudaMemcpy(d, h, size, cudaMemcpyHostToDevice);
+//	sum << <1, count >> > (d);
+//
+//	int hSum;
+//	cudaMemcpyFromSymbol(&hSum, dSum, sizeof(int));
+//	cout << "The sum of numbers from 1 to " << count << " is: " << hSum << endl;
+//
+//	cudaFree(d);
+//	return 0;
+//}
 
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-
-#include "sm_20_atomic_functions.h"
-
-#include <stdio.h>
-#include <iostream>
-using namespace std;
-
-__device__ int dSum = 0;
-
-__global__ void sum(int* d)
-{
-	int tid = threadIdx.x;
-	//dSum += d[tid];
-	//IMPLEMENTANDO SUMA ATOMICA
-	atomicAdd(&dSum, d[tid]);
-}
-
-
-int main()
-{
-	const int count = 128;
-	const int size = sizeof(int) * count;
-
-	int h[count];
-	for (int i = 0; i < count; i++)
-	{
-		h[i] = i + 1;
-	}
-
-	int* d;
-	cudaMalloc(&d, size);
-	cudaMemcpy(d, h, size, cudaMemcpyHostToDevice);
-	sum << <1, count >> > (d);
-
-	int hSum;
-	cudaMemcpyFromSymbol(&hSum, dSum, sizeof(int));
-	cout << "The sum of numbers from 1 to " << count << " is: " << hSum << endl;
-
-	cudaFree(d);
-	return 0;
-}
-
+//705 Monte carlo Pi.
+//
+//#include "cuda_runtime.h"
+//#include "device_launch_parameters.h"
+//
+//#include "curand.h"
+//
+//#include <stdio.h>
+//#include <iostream>
+//#include <iomanip> // precision numerica
+//
+//using namespace std;
+//
+//__device__ int dCount = 0; //la cuenta se inicializa en 0
+//
+////kernel
+//__global__ void countPoints(const float* xs, const float* ys) 
+//{
+//	int idx = blockIdx.x * blockDim.x + threadIdx.x; // obteniendo indice
+//
+//	float x = xs[idx] - 0.5f; 
+//	float y = ys[idx] - 0.5f;
+//	//Evaluacion de la posicion del circulo
+//	int n = sqrtf(x * x + y * y) > 0.5f ? 0 : 1; // 0 fuera del circulo, 1 dentro del circulo
+//
+//	// operacion atomica
+//	atomicAdd(&dCount, n);
+//
+//	//A VECES HAY QUE VERIFICAR QUE curand.lib EXISTA (LINKER-INPUT-ADDITIONAL DEPENDENCIES)
+//
+//}
+//
+//
+//int main()
+//{
+//	const int count = 512 * 512;
+//	const int size = count * sizeof(float);
+//	cudaError_t cudaStatus;
+//	curandStatus_t curandStatus;
+//	curandGenerator_t gen; // generador
+//
+//	//generando matriz de 512 * 512
+//	curandStatus = curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_MTGP32);
+//	curandSetPseudoRandomGeneratorSeed(gen, time(0)); // generador de semilla
+//
+//	//generar 2 matrices
+//	float* x;
+//	float* y;
+//	cudaStatus = cudaMalloc(&x, size);
+//	cudaStatus = cudaMalloc(&y, size);
+//
+//	//generando datos aleatorios uniformes
+//	curandStatus = curandGenerateUniform(gen, x, count);
+//	curandStatus = curandGenerateUniform(gen, y, count);
+//	
+//	// contar puntos
+//	countPoints << <512, 512 >> > (x, y);
+//
+//	int hCount;
+//	cudaMemcpyFromSymbol(&hCount, dCount, sizeof(int));
+//
+//	cudaFree(x);
+//	cudaFree(y);
+//
+//	cout << setprecision(12) << "pi is aproximately " << (4.0f * (float)hCount) / ((float)count) << endl;
+//
+//
+//}
+//
 
 
 //////------------------------------ 600 THREAD COOPERATION AND SYNCHRONIZATION  ---------------------------------------------------------------------------------  
