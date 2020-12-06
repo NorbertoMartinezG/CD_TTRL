@@ -10,6 +10,23 @@
 - single stream
 - multiple streams
 
+802- Events - how to measure performance?
+
+- use profiler (times only kernel duration + other invocations)
+- Cuda events (marca de tiempo que se registra en la gpu)
+	- event = timestamp
+	- Timestamp recorded on the GPU
+	- Invoked from the CPU side
+
+803 - Event API
+	- cudaEvent_t
+	- cudaEventCreate(&e)
+	- cudaEventRecord(e, 0)
+	- cudaEventSynchronize(e)
+	- cudaEventElapsedTime(&f, start, stop)
+
+
+
 
 */
 
