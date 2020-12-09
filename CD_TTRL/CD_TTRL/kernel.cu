@@ -25,10 +25,65 @@
 	- cudaEventSynchronize(e)
 	- cudaEventElapsedTime(&f, start, stop)
 
-
-
-
 */
+// 804 ATOMIC SUM usando events
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include "sm_20_atomic_functions.h"
+
+#include <stdio.h>
+#include <iostream>
+using namespace std;
+
+__device__ int dSum = 0;
+
+__global__ void sum(int* d)
+{
+	int tid = threadIdx.x;
+	//dSum += d[tid];
+	//IMPLEMENTANDO SUMA ATOMICA
+	atomicAdd(&dSum, d[tid]);
+}
+
+
+int main()
+{
+	const int count = 128;
+	const int size = sizeof(int) * count;
+
+	int h[count];
+	for (int i = 0; i < count; i++)
+	{
+		h[i] = i + 1;
+	}
+
+	int* d;
+	cudaMalloc(&d, size);
+	cudaMemcpy(d, h, size, cudaMemcpyHostToDevice);
+	
+	//EVENT--------------------------------------------------------------
+	cudaEvent_t start, end;
+	cudaEventCreate(&start);
+	cudaEventCreate(&end);
+
+	cudaEventRecord(start);
+	sum << <1, count >> > (d);
+	cudaEventRecord(end);
+	cudaEventSynchronize(end);
+
+	float elapsed;
+	cudaEventElapsedTime(&elapsed, start, end);
+	//EVENT--------------------------------------------------------------
+	
+	int hSum;
+	cudaMemcpyFromSymbol(&hSum, dSum, sizeof(int));
+	//cout << "The sum of numbers from 1 to " << count << " is: " << hSum << endl;
+	cout << "the sum of numbers form 1 to " << count << " is " << hSum << " and it took " << elapsed << " milisec" << endl;
+	cudaFree(d);
+	return 0;
+}
 
 
 
