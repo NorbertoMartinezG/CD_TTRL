@@ -25,7 +25,7 @@
 	- cudaEventSynchronize(e)
 	- cudaEventElapsedTime(&f, start, stop)
 
-*/
+
 // 804 ATOMIC SUM usando events
 
 #include "cuda_runtime.h"
@@ -84,6 +84,201 @@ int main()
 	cudaFree(d);
 	return 0;
 }
+
+*/
+/*
+// 805 Pineed Memory -- memoria anclada
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include <iostream>
+using namespace std;
+
+float timeMemory(bool pinned, bool toDevice) 
+{
+	const int count = 1 << 20;
+	const int iterations = 1 << 6;
+	const int size = count * sizeof(int);
+
+	cudaEvent_t start, end;
+	int* h, * d; // memoria apartada en cpu
+	float elapsed; //valor transcurrido o tiempo transcurrido 
+	cudaError_t	status;
+
+	cudaEventCreate(&start);
+	cudaEventCreate(&end);
+
+	cudaMalloc(&d, size); // memoria en gpu
+
+	if (pinned)
+	{
+		cudaHostAlloc(&h, size, cudaHostAllocDefault);
+	}
+	else
+	{
+		h = new int[count];
+	}
+
+	cudaEventRecord(start);
+
+	for (int i = 0; i < iterations; i++)
+	{
+		if (toDevice)
+		{
+			status = cudaMemcpy(d, h, size, cudaMemcpyHostToDevice);
+		}
+		else
+		{
+			status = cudaMemcpy(h, d, size, cudaMemcpyDeviceToHost);
+		}
+
+	}
+
+	cudaEventRecord(end);
+	cudaEventSynchronize(end);
+	cudaEventElapsedTime(&elapsed, start, end);
+
+	if (pinned)
+	{
+		cudaFreeHost(h);
+	}
+	else
+	{
+		delete[] h;
+	}
+	cudaFree(d);
+	cudaEventDestroy(start);
+	cudaEventDestroy(end);
+
+	return elapsed;
+
+}
+
+int main()
+{
+	const int count2 = 1 << 20; // a << b = a * (2 ^ b)  << es el operador de bit de desplazamiento a la izquierda.
+	const int iterations2 = 1 << 6;
+	cout << "count2 = " << count2 << endl;
+	cout << "iterations2 = " << iterations2 << endl;
+
+	cout << "From device, paged memory:\t" << timeMemory(false, false) << endl;
+	cout << "To device, paged memory:\t" << timeMemory(false, true) << endl;
+	cout << "From device, pinned memory:\t" << timeMemory(true, false) << endl;
+	cout << "To device, pinned memory:\t" << timeMemory(true, true) << endl;
+}
+*/
+/*
+//////------------------------------ 806-7 API STREAMS
+
+cudaStream_t
+cudaStreamCreate(&stream)
+kernel <<< blocks, threads, shared, stream >>>
+cudaMemcpyAsync() -- solo deja copiar en apuntadores (must use pinned memory)
+cudaStreamSynchronize(stream)
+*/
+//////------------------------------ 808 EJEMPLO STREAMS
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include <iostream>
+#include <cmath>
+#include <ctime>
+using namespace std;
+
+const int chunkCount = 1 << 20; // conteo constante y global
+const int totalCount = chunkCount << 3; //fragmentos
+
+__global__ void kernel(float* a, float* b, float* c) // kernel con entradas a y b y salida c
+{
+	int tid = blockDim.x * blockIdx.x + threadIdx.x; // identificacion del hilo unidimensional
+	
+	if (tid < chunkCount)// la identificacion del hilo debe ser menor al fragmento
+	{
+		c[tid] = erff(a[tid] + b[tid]); //funcion de error
+	}
+	
+}
+
+int main() // RESULTADO DE EJECUCION 11.22 MILISECONS
+{
+	//cudaDeviceProp prop;
+	//int device;
+	//cudaGetDevice(&device);
+	//cudaGetDeviceProperties(&prop, device);
+	//if (!prop.deviceOverlap)  // verifica que la gpu sea compatible (en este caso si lo es, revisar: Extensiones-Nsight-windows-system info)
+	//{
+	//	return 0;
+	//}
+
+	cudaEvent_t	start, end; // eventos para grabar
+	cudaEventCreate(&start);
+	cudaEventCreate(&end);
+
+	cudaStream_t stream;
+	cudaStreamCreate(&stream);
+
+	float* ha, * hb, * hc, * da, *db, *dc; // asignar dentro del host y el device
+	const int totalSize = totalCount * sizeof(float);
+	const int chunkSize = chunkCount * sizeof(float); /*4. La función sizeof()
+Para reservar memoria se debe saber exactamente el número de bytes que ocupa cualquier estructura de datos. 
+Tal y como se ha comentado con anterioridad, una peculiaridad del lenguaje C es que estos tamaños pueden variar 
+de una plataforma a otra. ¿Cómo sabemos, entonces, cuántos bytes reservar para una tabla de, por ejemplo, 10 enteros? 
+El propio lenguaje ofrece la solución a este problema mediante la función sizeof().
+
+La función recibe como único parámetro o el nombre de una variable, o el nombre de un tipo de datos, y devuelve 
+su tamaño en bytes. De esta forma, sizeof(int) devuelve el número de bytes que se utilizan para almacenar un entero. 
+La función se puede utilizar también con tipos de datos estructurados o uniones tal y como se muestra en el siguiente 
+programa (que te recomendamos que te descargues, compiles y ejecutes): */
+
+	// allocate memory -- asignar memoria
+	cudaMalloc(&da, chunkSize);
+	cudaMalloc(&db, chunkSize);
+	cudaMalloc(&dc, chunkSize);
+	cudaHostAlloc(&ha, totalSize, cudaHostAllocDefault);
+	cudaHostAlloc(&hb, totalSize, cudaHostAllocDefault);
+	cudaHostAlloc(&hc, totalSize, cudaHostAllocDefault);
+
+	// fill a and b
+	srand((unsigned)time(0)); // rellenar del lado de host
+	for (int i = 0; i < totalCount; i++)
+	{
+		ha[i] = rand() / RAND_MAX;
+		hb[i] = rand() / RAND_MAX;
+	}
+
+	cudaEventRecord(start, stream); // grabar evento
+
+	for (int i = 0; i < totalCount; i+= chunkCount) //contador que salta entre cada fragmento de datos para enviarlo al kernel
+	{
+		cudaMemcpyAsync(da, ha + i, chunkSize, cudaMemcpyHostToDevice, stream); // copia datos cuando el stream este listo
+		cudaMemcpyAsync(db, hb + i, chunkSize, cudaMemcpyHostToDevice, stream);
+		kernel << < chunkCount / 64, 64, 0, stream >> > (da, db, dc);
+		cudaMemcpyAsync(hc + i, dc, chunkSize, cudaMemcpyDeviceToHost, stream);
+	}
+
+	cudaStreamSynchronize(stream);
+	cudaEventRecord(end, stream);
+	cudaEventSynchronize(end);
+
+	float elapsed;
+	cudaEventElapsedTime(&elapsed, start, end);
+
+	cout << "This took " << elapsed << " milisec " << endl;
+
+	cudaFreeHost(ha);
+	cudaFreeHost(hb);
+	cudaFreeHost(hc);
+	cudaFree(da);
+	cudaFree(db);
+	cudaFree(dc);
+	cudaStreamDestroy(stream);
+
+
+
+}
+
+
+
 
 
 
