@@ -214,10 +214,11 @@ int main() // RESULTADO DE EJECUCION 11.22 MILISECONS
 	cudaEventCreate(&start);
 	cudaEventCreate(&end);
 
-	cudaStream_t stream;
-	cudaStreamCreate(&stream);
+	cudaStream_t stream1, stream2;
+	cudaStreamCreate(&stream1);
+	cudaStreamCreate(&stream2);
 
-	float* ha, * hb, * hc, * da, *db, *dc; // asignar dentro del host y el device
+	float* ha, * hb, * hc, * d1a, *d1b, *d1c,* d2a, * d2b, * d2c; // asignar dentro del host y el device
 	const int totalSize = totalCount * sizeof(float);
 	const int chunkSize = chunkCount * sizeof(float); /*4. La función sizeof()
 Para reservar memoria se debe saber exactamente el número de bytes que ocupa cualquier estructura de datos. 
@@ -231,9 +232,12 @@ La función se puede utilizar también con tipos de datos estructurados o uniones 
 programa (que te recomendamos que te descargues, compiles y ejecutes): */
 
 	// allocate memory -- asignar memoria
-	cudaMalloc(&da, chunkSize);
-	cudaMalloc(&db, chunkSize);
-	cudaMalloc(&dc, chunkSize);
+	cudaMalloc(&d1a, chunkSize);
+	cudaMalloc(&d1b, chunkSize);
+	cudaMalloc(&d1c, chunkSize);
+	cudaMalloc(&d2a, chunkSize);
+	cudaMalloc(&d2b, chunkSize);
+	cudaMalloc(&d2c, chunkSize);
 	cudaHostAlloc(&ha, totalSize, cudaHostAllocDefault);
 	cudaHostAlloc(&hb, totalSize, cudaHostAllocDefault);
 	cudaHostAlloc(&hc, totalSize, cudaHostAllocDefault);
@@ -246,18 +250,25 @@ programa (que te recomendamos que te descargues, compiles y ejecutes): */
 		hb[i] = rand() / RAND_MAX;
 	}
 
-	cudaEventRecord(start, stream); // grabar evento
+	cudaEventRecord(start, stream1); // grabar evento
 
-	for (int i = 0; i < totalCount; i+= chunkCount) //contador que salta entre cada fragmento de datos para enviarlo al kernel
+	for (int i = 0; i < totalCount; i+= chunkCount*2) //contador que salta entre cada fragmento de datos para enviarlo al kernel
 	{
-		cudaMemcpyAsync(da, ha + i, chunkSize, cudaMemcpyHostToDevice, stream); // copia datos cuando el stream este listo
-		cudaMemcpyAsync(db, hb + i, chunkSize, cudaMemcpyHostToDevice, stream);
-		kernel << < chunkCount / 64, 64, 0, stream >> > (da, db, dc);
-		cudaMemcpyAsync(hc + i, dc, chunkSize, cudaMemcpyDeviceToHost, stream);
+			cudaMemcpyAsync(d1a, ha + i, chunkSize, cudaMemcpyHostToDevice, stream1); // copia datos cuando el stream este listo
+			cudaMemcpyAsync(d2a, hb + i+chunkCount, chunkSize, cudaMemcpyHostToDevice, stream2);
+			cudaMemcpyAsync(d1a, hb + i, chunkSize, cudaMemcpyHostToDevice, stream1); // copia datos cuando el stream este listo
+			cudaMemcpyAsync(d2b, hb + i+chunkCount, chunkSize, cudaMemcpyHostToDevice, stream2);
+
+			kernel << < chunkCount / 64, 64, 0, stream1 >> > (d1a, d1b, d1c);
+			kernel << < chunkCount / 64, 64, 0, stream2 >> > (d2a, d2b, d2c);
+			
+			cudaMemcpyAsync(hc + i, d1c, chunkSize, cudaMemcpyDeviceToHost, stream1);
+			cudaMemcpyAsync(hc + i+chunkCount, d2c, chunkSize, cudaMemcpyDeviceToHost, stream2);
 	}
 
-	cudaStreamSynchronize(stream);
-	cudaEventRecord(end, stream);
+	cudaStreamSynchronize(stream1);
+	cudaStreamSynchronize(stream2);
+	cudaEventRecord(end, stream1);
 	cudaEventSynchronize(end);
 
 	float elapsed;
@@ -268,10 +279,14 @@ programa (que te recomendamos que te descargues, compiles y ejecutes): */
 	cudaFreeHost(ha);
 	cudaFreeHost(hb);
 	cudaFreeHost(hc);
-	cudaFree(da);
-	cudaFree(db);
-	cudaFree(dc);
-	cudaStreamDestroy(stream);
+	cudaFree(d1a);
+	cudaFree(d1b);
+	cudaFree(d1c);
+	cudaFree(d2a);
+	cudaFree(d2b);
+	cudaFree(d2c);
+	cudaStreamDestroy(stream1);
+	cudaStreamDestroy(stream2);
 
 
 
