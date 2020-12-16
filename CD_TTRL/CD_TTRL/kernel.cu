@@ -1,3 +1,28 @@
+//////------------------------------ 900 ADVANCED SCENARIOS  ---------------------------------------------------------------------------------  
+
+/*
+- Inline PTX
+- Driver API
+- Pinned Memory (again!)
+- Multi-GPU programming
+- Thrust
+
+PTX es el lenguaje ensamblador de CUDA
+- you can output PTX code from your kernel
+	- nvcc -ptx
+	- Project setting
+
+- You can also load a PTX kernel in with Driver API
+- Embedding PTX into kernel also possible
+	- asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
+	- Splices the PTX right into your kernel
+	- Allows referencing variables
+
+
+*/
+
+
+
 //////------------------------------ 800 EVENTS AND STREAMS  ---------------------------------------------------------------------------------  
 
 /*
