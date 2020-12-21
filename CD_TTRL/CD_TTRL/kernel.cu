@@ -1,116 +1,189 @@
 //////------------------------------ 900 ADVANCED SCENARIOS  ---------------------------------------------------------------------------------  
 
-/*
-- Inline PTX
-- Driver API
-- Pinned Memory (again!)
-- Multi-GPU programming
-- Thrust
+///*901-902
+//- Inline PTX
+//- Driver API
+//- Pinned Memory (again!)
+//- Multi-GPU programming
+//- Thrust
+//
+//PTX es el lenguaje ensamblador de CUDA
+//- you can output PTX code from your kernel
+//	- nvcc -ptx
+//	- Project setting
+//
+//- You can also load a PTX kernel in with Driver API
+//- Embedding PTX into kernel also possible
+//	- asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
+//	- Splices the PTX right into your kernel
+//	- Allows referencing variables
+//
+//*/
+///*
+//903 DRIVER API (carga archivos en tiempo de ejecucion)
+//	- Runtime API
+//	- Driver API
+//		- cuda.h, cuda.lib
+//		- allows low level control of CUDA
+//		- can be mixed with runtime API
+//		- Not useful to CUDA users in most cases
+//
+//904 PINNED MEMORY (flags)
+//	-cudaHostAlloc(pHost, size, flags)
+//		-cudaHostAllocMapped
+//			-Maps memory directly into GPU address space
+//			-Lets you access host memory directly from GPU
+//			-A.k.a. "zero-copy memory"
+//			-Use cudaHostGetDevicePointer()to get device addres
+//		-cudaHostAllocPortable
+//			-ordinary pinned memory visible to one host thread
+//			-portable pinned memory is allowed to migrate between host threads
+//
+//905 MULTI-GPU PROGRAMMING
+//	-Execute parts on separate devices
+//		-Splite the work
+//		-Excute kernels on separate threads
+//		-Combine the results
+//	-Use cudaSetDevice(id) to select the device to run on
+//	-Portable zero-copy memory useful for multi-threading
+//
+//906 THRUST LIBRARY (ahorra trabajo en instrucciones que se envian directamente a GPU sin necesidad de especificar un kernel)
+//	- STL like library for accelerated computation
+//	- Included with CUDA	
+//	- host_vector and device_vector
+//		-Assign, resize, etc. (but each[n] = z; causes a cudaMemcpy)
+//	- Predefined algorithms
+//		Search, sort, copy, reduce
+//	- Functor syntax
+//		- thrust::transform(x.begin(), x.end(), y.begin(),y.end(), thrust::multiplies<float());
+//	
+//*/
+//ejemplo 906 thrush library
 
-PTX es el lenguaje ensamblador de CUDA
-- you can output PTX code from your kernel
-	- nvcc -ptx
-	- Project setting
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
+#include <thrust/sort.h>
+using namespace thrust;
 
-- You can also load a PTX kernel in with Driver API
-- Embedding PTX into kernel also possible
-	- asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
-	- Splices the PTX right into your kernel
-	- Allows referencing variables
-
-
-*/
-
-
-
-//////------------------------------ 800 EVENTS AND STREAMS  ---------------------------------------------------------------------------------  
-
-/*
-- Events
-- Event API
-- Event example
-- Pinned memory
-- Streams
-- Stream API
-- single stream
-- multiple streams
-
-802- Events - how to measure performance?
-
-- use profiler (times only kernel duration + other invocations)
-- Cuda events (marca de tiempo que se registra en la gpu)
-	- event = timestamp
-	- Timestamp recorded on the GPU
-	- Invoked from the CPU side
-
-803 - Event API
-	- cudaEvent_t
-	- cudaEventCreate(&e)
-	- cudaEventRecord(e, 0)
-	- cudaEventSynchronize(e)
-	- cudaEventElapsedTime(&f, start, stop)
-
-
-// 804 ATOMIC SUM usando events
-
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-
-#include "sm_20_atomic_functions.h"
-
-#include <stdio.h>
-#include <iostream>
+#include <ctime>
 using namespace std;
 
-__device__ int dSum = 0;
 
-__global__ void sum(int* d)
+int myrand()
 {
-	int tid = threadIdx.x;
-	//dSum += d[tid];
-	//IMPLEMENTANDO SUMA ATOMICA
-	atomicAdd(&dSum, d[tid]);
+	return rand() % 10;
+
 }
 
 
 int main()
 {
-	const int count = 128;
-	const int size = sizeof(int) * count;
-
-	int h[count];
+	int count = 1024;
+	host_vector<int> h(count);
+	generate(begin(h), end(h), myrand);
+	device_vector<int> d = h; // copia el vector host al device
+	sort(begin(d), end(d));
+	h = d;
 	for (int i = 0; i < count; i++)
 	{
-		h[i] = i + 1;
+		cout << h[i] << "\t";
 	}
 
-	int* d;
-	cudaMalloc(&d, size);
-	cudaMemcpy(d, h, size, cudaMemcpyHostToDevice);
-	
-	//EVENT--------------------------------------------------------------
-	cudaEvent_t start, end;
-	cudaEventCreate(&start);
-	cudaEventCreate(&end);
 
-	cudaEventRecord(start);
-	sum << <1, count >> > (d);
-	cudaEventRecord(end);
-	cudaEventSynchronize(end);
-
-	float elapsed;
-	cudaEventElapsedTime(&elapsed, start, end);
-	//EVENT--------------------------------------------------------------
-	
-	int hSum;
-	cudaMemcpyFromSymbol(&hSum, dSum, sizeof(int));
-	//cout << "The sum of numbers from 1 to " << count << " is: " << hSum << endl;
-	cout << "the sum of numbers form 1 to " << count << " is " << hSum << " and it took " << elapsed << " milisec" << endl;
-	cudaFree(d);
-	return 0;
 }
 
-*/
+
+
+
+//////------------------------------ 800 EVENTS AND STREAMS  ---------------------------------------------------------------------------------  
+
+///*
+//- Events
+//- Event API
+//- Event example
+//- Pinned memory
+//- Streams
+//- Stream API
+//- single stream
+//- multiple streams
+//
+//802- Events - how to measure performance?
+//
+//- use profiler (times only kernel duration + other invocations)
+//- Cuda events (marca de tiempo que se registra en la gpu)
+//	- event = timestamp
+//	- Timestamp recorded on the GPU
+//	- Invoked from the CPU side
+//
+//803 - Event API
+//	- cudaEvent_t
+//	- cudaEventCreate(&e)
+//	- cudaEventRecord(e, 0)
+//	- cudaEventSynchronize(e)
+//	- cudaEventElapsedTime(&f, start, stop)
+//
+//
+//// 804 ATOMIC SUM usando events
+//
+//#include "cuda_runtime.h"
+//#include "device_launch_parameters.h"
+//
+//#include "sm_20_atomic_functions.h"
+//
+//#include <stdio.h>
+//#include <iostream>
+//using namespace std;
+//
+//__device__ int dSum = 0;
+//
+//__global__ void sum(int* d)
+//{
+//	int tid = threadIdx.x;
+//	//dSum += d[tid];
+//	//IMPLEMENTANDO SUMA ATOMICA
+//	atomicAdd(&dSum, d[tid]);
+//}
+//
+//
+//int main()
+//{
+//	const int count = 128;
+//	const int size = sizeof(int) * count;
+//
+//	int h[count];
+//	for (int i = 0; i < count; i++)
+//	{
+//		h[i] = i + 1;
+//	}
+//
+//	int* d;
+//	cudaMalloc(&d, size);
+//	cudaMemcpy(d, h, size, cudaMemcpyHostToDevice);
+//	
+//	//EVENT--------------------------------------------------------------
+//	cudaEvent_t start, end;
+//	cudaEventCreate(&start);
+//	cudaEventCreate(&end);
+//
+//	cudaEventRecord(start);
+//	sum << <1, count >> > (d);
+//	cudaEventRecord(end);
+//	cudaEventSynchronize(end);
+//
+//	float elapsed;
+//	cudaEventElapsedTime(&elapsed, start, end);
+//	//EVENT--------------------------------------------------------------
+//	
+//	int hSum;
+//	cudaMemcpyFromSymbol(&hSum, dSum, sizeof(int));
+//	//cout << "The sum of numbers from 1 to " << count << " is: " << hSum << endl;
+//	cout << "the sum of numbers form 1 to " << count << " is " << hSum << " and it took " << elapsed << " milisec" << endl;
+//	cudaFree(d);
+//	return 0;
+//}
+
+//*/
+
 /*
 // 805 Pineed Memory -- memoria anclada
 
@@ -203,119 +276,119 @@ cudaStreamSynchronize(stream)
 */
 //////------------------------------ 808 EJEMPLO STREAMS
 
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-#include <iostream>
-#include <cmath>
-#include <ctime>
-using namespace std;
-
-const int chunkCount = 1 << 20; // conteo constante y global
-const int totalCount = chunkCount << 3; //fragmentos
-
-__global__ void kernel(float* a, float* b, float* c) // kernel con entradas a y b y salida c
-{
-	int tid = blockDim.x * blockIdx.x + threadIdx.x; // identificacion del hilo unidimensional
-	
-	if (tid < chunkCount)// la identificacion del hilo debe ser menor al fragmento
-	{
-		c[tid] = erff(a[tid] + b[tid]); //funcion de error
-	}
-	
-}
-
-int main() // RESULTADO DE EJECUCION 11.22 MILISECONS
-{
-	//cudaDeviceProp prop;
-	//int device;
-	//cudaGetDevice(&device);
-	//cudaGetDeviceProperties(&prop, device);
-	//if (!prop.deviceOverlap)  // verifica que la gpu sea compatible (en este caso si lo es, revisar: Extensiones-Nsight-windows-system info)
-	//{
-	//	return 0;
-	//}
-
-	cudaEvent_t	start, end; // eventos para grabar
-	cudaEventCreate(&start);
-	cudaEventCreate(&end);
-
-	cudaStream_t stream1, stream2;
-	cudaStreamCreate(&stream1);
-	cudaStreamCreate(&stream2);
-
-	float* ha, * hb, * hc, * d1a, *d1b, *d1c,* d2a, * d2b, * d2c; // asignar dentro del host y el device
-	const int totalSize = totalCount * sizeof(float);
-	const int chunkSize = chunkCount * sizeof(float); /*4. La función sizeof()
-Para reservar memoria se debe saber exactamente el número de bytes que ocupa cualquier estructura de datos. 
-Tal y como se ha comentado con anterioridad, una peculiaridad del lenguaje C es que estos tamaños pueden variar 
-de una plataforma a otra. ¿Cómo sabemos, entonces, cuántos bytes reservar para una tabla de, por ejemplo, 10 enteros? 
-El propio lenguaje ofrece la solución a este problema mediante la función sizeof().
-
-La función recibe como único parámetro o el nombre de una variable, o el nombre de un tipo de datos, y devuelve 
-su tamaño en bytes. De esta forma, sizeof(int) devuelve el número de bytes que se utilizan para almacenar un entero. 
-La función se puede utilizar también con tipos de datos estructurados o uniones tal y como se muestra en el siguiente 
-programa (que te recomendamos que te descargues, compiles y ejecutes): */
-
-	// allocate memory -- asignar memoria
-	cudaMalloc(&d1a, chunkSize);
-	cudaMalloc(&d1b, chunkSize);
-	cudaMalloc(&d1c, chunkSize);
-	cudaMalloc(&d2a, chunkSize);
-	cudaMalloc(&d2b, chunkSize);
-	cudaMalloc(&d2c, chunkSize);
-	cudaHostAlloc(&ha, totalSize, cudaHostAllocDefault);
-	cudaHostAlloc(&hb, totalSize, cudaHostAllocDefault);
-	cudaHostAlloc(&hc, totalSize, cudaHostAllocDefault);
-
-	// fill a and b
-	srand((unsigned)time(0)); // rellenar del lado de host
-	for (int i = 0; i < totalCount; i++)
-	{
-		ha[i] = rand() / RAND_MAX;
-		hb[i] = rand() / RAND_MAX;
-	}
-
-	cudaEventRecord(start, stream1); // grabar evento
-
-	for (int i = 0; i < totalCount; i+= chunkCount*2) //contador que salta entre cada fragmento de datos para enviarlo al kernel
-	{
-			cudaMemcpyAsync(d1a, ha + i, chunkSize, cudaMemcpyHostToDevice, stream1); // copia datos cuando el stream este listo
-			cudaMemcpyAsync(d2a, hb + i+chunkCount, chunkSize, cudaMemcpyHostToDevice, stream2);
-			cudaMemcpyAsync(d1a, hb + i, chunkSize, cudaMemcpyHostToDevice, stream1); // copia datos cuando el stream este listo
-			cudaMemcpyAsync(d2b, hb + i+chunkCount, chunkSize, cudaMemcpyHostToDevice, stream2);
-
-			kernel << < chunkCount / 64, 64, 0, stream1 >> > (d1a, d1b, d1c);
-			kernel << < chunkCount / 64, 64, 0, stream2 >> > (d2a, d2b, d2c);
-			
-			cudaMemcpyAsync(hc + i, d1c, chunkSize, cudaMemcpyDeviceToHost, stream1);
-			cudaMemcpyAsync(hc + i+chunkCount, d2c, chunkSize, cudaMemcpyDeviceToHost, stream2);
-	}
-
-	cudaStreamSynchronize(stream1);
-	cudaStreamSynchronize(stream2);
-	cudaEventRecord(end, stream1);
-	cudaEventSynchronize(end);
-
-	float elapsed;
-	cudaEventElapsedTime(&elapsed, start, end);
-
-	cout << "This took " << elapsed << " milisec " << endl;
-
-	cudaFreeHost(ha);
-	cudaFreeHost(hb);
-	cudaFreeHost(hc);
-	cudaFree(d1a);
-	cudaFree(d1b);
-	cudaFree(d1c);
-	cudaFree(d2a);
-	cudaFree(d2b);
-	cudaFree(d2c);
-	cudaStreamDestroy(stream1);
-	cudaStreamDestroy(stream2);
-
-
-
-}
+//#include "cuda_runtime.h"
+//#include "device_launch_parameters.h"
+//#include <iostream>
+//#include <cmath>
+//#include <ctime>
+//using namespace std;
+//
+//const int chunkCount = 1 << 20; // conteo constante y global
+//const int totalCount = chunkCount << 3; //fragmentos
+//
+//__global__ void kernel(float* a, float* b, float* c) // kernel con entradas a y b y salida c
+//{
+//	int tid = blockDim.x * blockIdx.x + threadIdx.x; // identificacion del hilo unidimensional
+//	
+//	if (tid < chunkCount)// la identificacion del hilo debe ser menor al fragmento
+//	{
+//		c[tid] = erff(a[tid] + b[tid]); //funcion de error
+//	}
+//	
+//}
+//
+//int main() // RESULTADO DE EJECUCION 11.22 MILISECONS
+//{
+//	//cudaDeviceProp prop;
+//	//int device;
+//	//cudaGetDevice(&device);
+//	//cudaGetDeviceProperties(&prop, device);
+//	//if (!prop.deviceOverlap)  // verifica que la gpu sea compatible (en este caso si lo es, revisar: Extensiones-Nsight-windows-system info)
+//	//{
+//	//	return 0;
+//	//}
+//
+//	cudaEvent_t	start, end; // eventos para grabar
+//	cudaEventCreate(&start);
+//	cudaEventCreate(&end);
+//
+//	cudaStream_t stream1, stream2;
+//	cudaStreamCreate(&stream1);
+//	cudaStreamCreate(&stream2);
+//
+//	float* ha, * hb, * hc, * d1a, *d1b, *d1c,* d2a, * d2b, * d2c; // asignar dentro del host y el device
+//	const int totalSize = totalCount * sizeof(float);
+//	const int chunkSize = chunkCount * sizeof(float); /*4. La función sizeof()
+//Para reservar memoria se debe saber exactamente el número de bytes que ocupa cualquier estructura de datos. 
+//Tal y como se ha comentado con anterioridad, una peculiaridad del lenguaje C es que estos tamaños pueden variar 
+//de una plataforma a otra. ¿Cómo sabemos, entonces, cuántos bytes reservar para una tabla de, por ejemplo, 10 enteros? 
+//El propio lenguaje ofrece la solución a este problema mediante la función sizeof().
+//
+//La función recibe como único parámetro o el nombre de una variable, o el nombre de un tipo de datos, y devuelve 
+//su tamaño en bytes. De esta forma, sizeof(int) devuelve el número de bytes que se utilizan para almacenar un entero. 
+//La función se puede utilizar también con tipos de datos estructurados o uniones tal y como se muestra en el siguiente 
+//programa (que te recomendamos que te descargues, compiles y ejecutes): */
+//
+//	// allocate memory -- asignar memoria
+//	cudaMalloc(&d1a, chunkSize);
+//	cudaMalloc(&d1b, chunkSize);
+//	cudaMalloc(&d1c, chunkSize);
+//	cudaMalloc(&d2a, chunkSize);
+//	cudaMalloc(&d2b, chunkSize);
+//	cudaMalloc(&d2c, chunkSize);
+//	cudaHostAlloc(&ha, totalSize, cudaHostAllocDefault);
+//	cudaHostAlloc(&hb, totalSize, cudaHostAllocDefault);
+//	cudaHostAlloc(&hc, totalSize, cudaHostAllocDefault);
+//
+//	// fill a and b
+//	srand((unsigned)time(0)); // rellenar del lado de host
+//	for (int i = 0; i < totalCount; i++)
+//	{
+//		ha[i] = rand() / RAND_MAX;
+//		hb[i] = rand() / RAND_MAX;
+//	}
+//
+//	cudaEventRecord(start, stream1); // grabar evento
+//
+//	for (int i = 0; i < totalCount; i+= chunkCount*2) //contador que salta entre cada fragmento de datos para enviarlo al kernel
+//	{
+//			cudaMemcpyAsync(d1a, ha + i, chunkSize, cudaMemcpyHostToDevice, stream1); // copia datos cuando el stream este listo
+//			cudaMemcpyAsync(d2a, hb + i+chunkCount, chunkSize, cudaMemcpyHostToDevice, stream2);
+//			cudaMemcpyAsync(d1a, hb + i, chunkSize, cudaMemcpyHostToDevice, stream1); // copia datos cuando el stream este listo
+//			cudaMemcpyAsync(d2b, hb + i+chunkCount, chunkSize, cudaMemcpyHostToDevice, stream2);
+//
+//			kernel << < chunkCount / 64, 64, 0, stream1 >> > (d1a, d1b, d1c);
+//			kernel << < chunkCount / 64, 64, 0, stream2 >> > (d2a, d2b, d2c);
+//			
+//			cudaMemcpyAsync(hc + i, d1c, chunkSize, cudaMemcpyDeviceToHost, stream1);
+//			cudaMemcpyAsync(hc + i+chunkCount, d2c, chunkSize, cudaMemcpyDeviceToHost, stream2);
+//	}
+//
+//	cudaStreamSynchronize(stream1);
+//	cudaStreamSynchronize(stream2);
+//	cudaEventRecord(end, stream1);
+//	cudaEventSynchronize(end);
+//
+//	float elapsed;
+//	cudaEventElapsedTime(&elapsed, start, end);
+//
+//	cout << "This took " << elapsed << " milisec " << endl;
+//
+//	cudaFreeHost(ha);
+//	cudaFreeHost(hb);
+//	cudaFreeHost(hc);
+//	cudaFree(d1a);
+//	cudaFree(d1b);
+//	cudaFree(d1c);
+//	cudaFree(d2a);
+//	cudaFree(d2b);
+//	cudaFree(d2c);
+//	cudaStreamDestroy(stream1);
+//	cudaStreamDestroy(stream2);
+//
+//
+//
+//}
 
 
 
